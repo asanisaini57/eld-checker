@@ -405,6 +405,13 @@
       text-align: center;
     }
     table.sheet-preview td:first-child { text-align: left; font-weight: 600; }
+    td.sv-write {
+      text-align: left; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--success);
+    }
+    tr.row-readonly td.sv-write { color: var(--text-faint); }
+    tr.row-readonly td { opacity: 0.55; }
     td.sv-good { color: var(--success);  background: var(--success-bg); }
     td.sv-bad  { color: var(--danger);   background: var(--danger-bg); }
     td.sv-corr { color: var(--warning);  background: var(--warning-bg); }
@@ -630,6 +637,9 @@
       if (data.corrections && data.corrections.length) {
         msg += `\n\nMarked Miss/Corr:\n  ${data.corrections.join('\n  ')}`;
       }
+      if (data.held_back && data.held_back.length) {
+        msg += `\n\nOlder than yesterday — checked but not written (${data.write_window} was written):\n  ${data.held_back.join('\n  ')}`;
+      }
       if (data.blocks_created && data.blocks_created.length) {
         msg += `\n\n${data.blocks_created.length} roster row(s) prepared for upcoming dates.`;
       }
@@ -771,28 +781,36 @@
     if (!rows.length) return '';
 
     const body = rows.map(r => `
-      <tr>${SHEET_COLS.map(([key, _]) => {
+      <tr class="${r._will_write === false ? 'row-readonly' : ''}">
+        <td class="sv-write">${r._will_write === false ? 'review only' : 'writes'}</td>
+        ${SHEET_COLS.map(([key, _]) => {
         const v = r[key] ?? '';
         const bad = (key === 'jump' || key === 'unassigned' || key === 'tamper') && v === 'Yes';
         return `<td class="${bad ? 'sv-bad' : cellClass(v)}">${esc(v)}</td>`;
       }).join('')}</tr>`).join('');
 
     const miles = rows.map(r => r._miles_today).filter(m => m || m === 0);
+    const held = rows.filter(r => r._will_write === false).length;
 
     return `
       <div class="preview">
         <div class="preview-head">
-          <strong>Rows to be written</strong>
+          <strong>Rows from this logbook</strong>
           <span>${rows.length} day${rows.length === 1 ? '' : 's'}${
-            miles.length ? ' &middot; ' + miles.map(m => m + ' mi').join(', ') : ''}</span>
+            miles.length ? ' &middot; ' + miles.map(m => m + ' mi').join(', ') : ''}${
+            held ? ' &middot; ' + held + ' older than yesterday, reviewed but not written' : ''}</span>
         </div>
         <div class="table-wrap">
           <table class="sheet-preview">
-            <thead><tr>${SHEET_COLS.map(([_, label]) => `<th>${label}</th>`).join('')}</tr></thead>
+            <thead><tr><th>Sheet</th>${SHEET_COLS.map(([_, label]) => `<th>${label}</th>`).join('')}</tr></thead>
             <tbody>${body}</tbody>
           </table>
         </div>
         <p class="preview-note">
+          Only <strong>today and yesterday</strong> are written to the sheet. Earlier days are
+          still checked and any error or jump is listed below, but their rows are left alone
+          because they have already been reviewed.
+          <br>
           HOS Violations, Action Taken, Remark and Trailer Hard Copy are never written &mdash; they stay yours.
           An item the sheet already records as <em>Missing</em> that now reads <em>Yes</em> is written as
           <strong>Miss/Corr</strong> and the day&rsquo;s Status becomes <strong>Resolved</strong>.

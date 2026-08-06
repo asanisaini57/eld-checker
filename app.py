@@ -100,6 +100,10 @@ def load_config():
         # strptime pattern for how dates should be written. Empty = copy whatever
         # format the sheet already uses.
         "date_format": "",
+        # How many days back from today may be written to the sheet. 1 = today and
+        # yesterday. Older days are still analysed and reported, just not written,
+        # because they have already been reviewed and copied to the master sheet.
+        "write_days_back": 1,
     }
     if os.path.exists(CONFIG_PATH):
         try:
@@ -730,6 +734,13 @@ def analyze_pdf(pdf_path, filename, cfg, today=None):
 
     all_findings.sort(key=lambda f: (f.get('date') or '', f.get('time') or ''))
 
+    # Flag which rows the export will actually write, so the preview can say so
+    # rather than quietly dropping them.
+    cutoff = today - timedelta(days=max(0, int(cfg.get("write_days_back", 1))))
+    for row in rows:
+        day_date = parse_any_date(row['date'])
+        row['_will_write'] = bool(day_date and cutoff <= day_date <= today)
+
     return {
         "filename":       filename,
         "driver_name":    driver,
@@ -1026,11 +1037,30 @@ def push_rows(ws, prepared, cfg, today=None):
         cfg.get("date_format", ""),
     )
 
-    # Every date this upload touches, plus today and tomorrow so the next day's
-    # list is always standing ready.
-    wanted_dates = {parse_any_date(r['date']) for r in prepared}
-    wanted_dates.discard(None)
-    wanted_dates |= {today, today + timedelta(days=1)}
+    # Only recent days are written. Anything older has already been reviewed and
+    # copied to the master sheet, so rewriting it would overwrite manual work —
+    # but it is still analysed and reported, just held back from the sheet.
+    cutoff = today - timedelta(days=max(0, int(cfg.get("write_days_back", 1))))
+    writable, held_back, unknown = [], [], []
+    for row in prepared:
+        # Resolve the PDF's spelling to the roster entry first, so an alias lands
+        # on the driver's existing row and every report uses one name for them.
+        entry = match_roster_driver(row['driver_name'], roster)
+        if entry:
+            row['driver_name'] = entry['name']
+        elif roster:
+            unknown.append(row['driver_name'])
+
+        day_date = parse_any_date(row['date'])
+        if day_date and cutoff <= day_date <= today:
+            writable.append(row)
+        else:
+            held_back.append(f"{row['driver_name']} {row['date']}")
+
+    # Blocks are only prepared for the window we write to, plus tomorrow so the
+    # next day's list is always standing ready.
+    wanted_dates = {cutoff + timedelta(days=n)
+                    for n in range((today - cutoff).days + 2)}
     blocks_created = ensure_day_blocks(ws, mapping, wanted_dates, fmt_date, roster)
 
     # Re-read so the rows just created are found and filled in place
@@ -1038,19 +1068,10 @@ def push_rows(ws, prepared, cfg, today=None):
     index = _index_rows(all_values, date_col, driver_col)
 
     next_row = len(all_values) + 1
-    updates, added, updated, corrections, unknown = [], 0, 0, [], []
+    updates, added, updated, corrections = [], 0, 0, []
 
-    for row in prepared:
+    for row in writable:
         day_date = parse_any_date(row['date'])
-
-        # Resolve the PDF's spelling to the roster entry so an alias lands on the
-        # driver's existing row instead of appending a near-duplicate.
-        entry = match_roster_driver(row['driver_name'], roster)
-        if entry:
-            row['driver_name'] = entry['name']
-        elif roster:
-            unknown.append(row['driver_name'])
-
         key = (day_date, _norm_driver(row['driver_name']))
 
         if key in index:
@@ -1082,6 +1103,8 @@ def push_rows(ws, prepared, cfg, today=None):
         "rows_updated":   updated,
         "corrections":    corrections,
         "blocks_created": blocks_created,
+        "held_back": held_back,
+        "write_window": f"{cutoff.isoformat()} to {today.isoformat()}",
         "unknown_drivers": sorted(set(unknown)),
         "columns_filled": sorted(mapping.keys()),
         "columns_left_alone": unmapped,

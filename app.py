@@ -104,6 +104,9 @@ def load_config():
         # yesterday. Older days are still analysed and reported, just not written,
         # because they have already been reviewed and copied to the master sheet.
         "write_days_back": 1,
+        # Consecutive off-duty/sleeper hours that must precede driving for the
+        # day to count as a new working day rather than yesterday's run.
+        "new_shift_rest_hours": 10,
     }
     if os.path.exists(CONFIG_PATH):
         try:
@@ -172,6 +175,14 @@ def match_roster_driver(name, roster):
 ACTIVE_STATUSES = {"DRIVING", "PERSONAL", "YARD", "YARD MOVES"}
 # Truck is stopped — odometer must NOT change
 STATIONARY_STATUSES = {"OFF DUTY", "ON DUTY", "SLEEPER BERTH"}
+# ── Break accounting, separate from the odometer view above ──────────
+# PERSONAL is active for the odometer (the truck moves, so miles must accrue) but
+# it is off-duty time for the driver, so it counts towards a 10-hour break and can
+# sit in the middle of one without breaking it.
+SHIFT_REST_STATUSES = {"OFF DUTY", "SLEEPER BERTH", "PERSONAL"}
+# Only these start a working shift. ON DUTY neither adds to a break nor breaks it —
+# it is the pre-trip between the rest and the wheel.
+SHIFT_WORK_STATUSES = {"DRIVING", "YARD", "YARD MOVES"}
 ALL_STATUSES = ACTIVE_STATUSES | STATIONARY_STATUSES
 
 LOW_DIFF_MILES      = 3    # diff <= this → low priority finding
@@ -609,7 +620,9 @@ def build_day_row(driver_name, day, findings, cfg, today):
     meta   = day['meta']
     events = day['events']
 
-    worked = any(e['status'] == 'DRIVING' for e in events) or bool(meta['miles_today'])
+    # Working means a shift *started* today. Driving alone isn't enough — it may
+    # be the tail of yesterday's run crossing midnight.
+    worked = bool(day.get('shift_started'))
 
     # A "jump" is stationary odometer movement past the noise limit, or an active
     # event whose odometer failed to advance. Both surface as ERROR findings.
@@ -719,12 +732,54 @@ def fill_missing_days(days, today):
     return filled
 
 
+def mark_shift_starts(days, rest_hours):
+    """Flag which days a new working shift actually began on.
+
+    A shift begins at the first driving after at least `rest_hours` of off-duty
+    time. The rest run carries across midnight, which is the point: a driver still
+    rolling at 00:00 is finishing yesterday's run, not starting today's, so that
+    day is not a working day for him.
+
+    Off-duty time here includes personal conveyance, so a sleeper split by a spell
+    of personal driving still adds up to a completed break.
+    """
+    needed = rest_hours * 60
+    rest = 0
+    last_start = None
+
+    for index, day in enumerate(days):
+        day['shift_started'] = False
+        day['continues_from'] = None
+
+        for event in day['events']:
+            status = event['status']
+            if status in SHIFT_REST_STATUSES:
+                rest += event['duration_minutes'] or 0
+            elif status in SHIFT_WORK_STATUSES:
+                if rest >= needed:
+                    day['shift_started'] = True
+                    last_start = f"{day['date']} {event['time'][:5]}"
+                elif day['continues_from'] is None:
+                    day['continues_from'] = last_start
+                rest = 0
+
+        # The earliest day in the PDF has no visible history, so a continuation
+        # there can't be distinguished from a genuine start. Don't call it idle.
+        if index == 0 and not day['shift_started'] and day['events']:
+            if any(e['status'] in SHIFT_WORK_STATUSES for e in day['events']):
+                day['shift_started'] = True
+                day['continues_from'] = None
+
+    return days
+
+
 def analyze_pdf(pdf_path, filename, cfg, today=None):
     """Full result for one PDF: findings plus one prepared sheet row per day."""
     today  = today or date.today()
     parsed = parse_pdf(pdf_path)
     driver = parsed['driver_name']
     parsed['days'] = fill_missing_days(parsed['days'], today)
+    mark_shift_starts(parsed['days'], cfg.get("new_shift_rest_hours", 10))
 
     all_findings, rows = [], []
     for day in parsed['days']:

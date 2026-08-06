@@ -41,16 +41,18 @@ someone to fork it and it makes the project's purpose (and your carrier) public.
 
 | Name | Value |
 |---|---|
-| `ELD_USERS` | `you:yourpassword,teammate:theirpassword` |
+| `ELD_USERS` | `you:yourpassword,friend:theirpassword` |
 | `ELD_SECRET_KEY` | any long random string |
 | `ELD_SHEET_ID` | the sheet ID from its URL |
 | `GOOGLE_CREDENTIALS_JSON` | the **entire contents** of `service_account.json`, pasted as one value |
+| `ELD_ROSTER_JSON` | the **entire contents** of `roster.json`, pasted as one value |
 
 5. Deploy. You get an `https://…onrender.com` URL. Share it and the second
-   username/password with your teammate.
+   username/password with your friend.
 
-`roster.json` isn't in the repo, so either add it through Render's Secret Files or
-commit a version with the real names once the repo is private.
+The last two are files on your machine that must never enter the repository — pasting
+them as environment variables keeps the driver names and the private key out of
+GitHub entirely. Every push to `main` redeploys automatically.
 
 ### Free-tier caveat
 

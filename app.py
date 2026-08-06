@@ -113,7 +113,18 @@ def load_config():
 
 
 def load_roster():
-    """Drivers in the order their rows should appear under each date."""
+    """Drivers in the order their rows should appear under each date.
+
+    Read from ELD_ROSTER_JSON when set, else roster.json. Hosted deployments use
+    the environment variable so real driver names never enter the repository.
+    """
+    raw = os.environ.get("ELD_ROSTER_JSON", "").strip()
+    if raw:
+        try:
+            return json.loads(raw).get("drivers", [])
+        except ValueError:
+            return []
+
     if not os.path.exists(ROSTER_PATH):
         return []
     try:

@@ -52,11 +52,47 @@ committed. Only the `spreadsheets` scope is requested.
 3. **`analyze_day`** — findings for one day. **Events are only ever compared with the
    next event on the same day.** Comparing across a day boundary used to invent
    violations whenever a day was missing from the PDF.
-4. **`build_day_row`** — one sheet row per day, in the sheet's own vocabulary
+4. **`mark_shift_starts`** — decides which days the driver actually started work.
+   See below; `build_day_row` reads `day['shift_started']` for `Working`.
+5. **`build_day_row`** — one sheet row per day, in the sheet's own vocabulary
    (`Yes` / `No` / `Missing` / `Miss/Corr` / `N/A`, `Okay` / `Pending` / `Resolved`).
-   A day with no driving and no miles becomes `Working = No` with `N/A` across the checks.
-5. **`push_rows`** — upsert keyed on (date, driver), dates compared as parsed dates so
+   A day that isn't a working day becomes `Working = No` with `N/A` across the checks.
+6. **`push_rows`** — upsert keyed on (date, driver), dates compared as parsed dates so
    format differences don't create duplicates.
+
+### What counts as a working day
+
+`Working` means a shift **began** that day — not merely that driving appears on it.
+A driver still rolling at 00:00 is finishing yesterday's run, so that day is his
+day off. `mark_shift_starts` walks the whole timeline and marks a shift at the
+first driving after `new_shift_rest_hours` (default 10) of off-duty time, carrying
+the rest run across midnight.
+
+Two distinctions matter and are easy to get wrong:
+
+- **`PERSONAL` is active for the odometer but rest for the break.** The truck moves,
+  so miles must accrue — but the driver is off duty, so personal conveyance counts
+  towards a 10-hour break and can sit in the middle of one without breaking it.
+  Hence `ACTIVE_STATUSES` vs `SHIFT_REST_STATUSES` / `SHIFT_WORK_STATUSES`. Sharing
+  one set marked a 762-mile day as not working.
+- **`ON DUTY` neither extends a break nor breaks it.** It is the pre-trip between
+  the rest and the wheel.
+
+The earliest day in a PDF is exempt: with no visible history a continuation cannot
+be told from a genuine start, so it is not called idle.
+
+Consequences, both confirmed as wanted: a day of nothing but sleeper berth is
+`Working = No` even though the page exists, and a carry-over day is `Working = No`
+with `N/A` across — including `Sign`, so an unsigned log for a day the driver did
+drive is not flagged.
+
+### Only recent days are written
+
+Writes are limited to today and the previous `write_days_back` days (default 1).
+Older days are still parsed and every finding reported — they are just held back,
+because they have already been reviewed and copied to the master. `push_rows`
+returns `held_back` so nothing is dropped silently, and the preview marks each row
+`writes` or `review only`.
 
 ### Table column order
 

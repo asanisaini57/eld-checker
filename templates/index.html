@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ELD Checker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-faint: #94a3b8;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --success: #059669;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --warning: #d97706;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+      --purple: #7c3aed;
+      --purple-bg: #f5f3ff;
+      --purple-border: #ddd6fe;
+      --teal: #0d9488;
+      --teal-bg: #f0fdfa;
+      --teal-border: #99f6e4;
+
+      --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+      --shadow-md: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+      --shadow-lg: 0 4px 6px rgba(15,23,42,0.04), 0 10px 15px rgba(15,23,42,0.06);
+
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "cv11", "ss01";
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: saturate(180%) blur(10px);
+      background: rgba(255,255,255,0.85);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: linear-gradient(135deg, #0f172a, #334155);
+      color: #fff; display: grid; place-items: center;
+      font-weight: 700; font-size: 1rem;
+      box-shadow: var(--shadow-md);
+    }
+    .brand-text h1 { font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+    .brand-text span { font-size: 0.78rem; color: var(--text-muted); }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: 999px;
+      background: var(--success-bg); color: var(--success);
+      border: 1px solid var(--success-border);
+      font-size: 0.78rem; font-weight: 600;
+    }
+    .status-pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(5,150,105,0.18);
+    }
+
+    /* Layout */
+    .container { max-width: 1200px; margin: 32px auto; padding: 0 24px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .card-title {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.95rem; font-weight: 600; color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .card-title .icon {
+      width: 24px; height: 24px; border-radius: 6px;
+      background: var(--accent-soft); color: var(--accent);
+      display: grid; place-items: center; font-size: 0.75rem; font-weight: 700;
+    }
+
+    /* Upload */
+    .upload-zone {
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius);
+      padding: 44px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+      position: relative;
+      background: var(--bg);
+    }
+    .upload-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .upload-zone.dragover {
+      border-color: var(--accent); background: var(--accent-soft);
+      transform: scale(1.005);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+    .upload-zone .upload-icon {
+      width: 48px; height: 48px; margin: 0 auto 12px;
+      border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      display: grid; place-items: center;
+      color: var(--accent);
+    }
+    .upload-zone .upload-icon svg { width: 22px; height: 22px; }
+    .upload-zone p {
+      color: var(--text-muted); font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+    .upload-zone p strong { color: var(--accent); font-weight: 600; }
+    .upload-zone .hint { font-size: 0.76rem; color: var(--text-faint); }
+    .upload-zone .file-name {
+      margin-top: 14px; font-weight: 500; color: var(--text);
+      font-size: 0.87rem;
+      padding: 8px 12px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      display: inline-block; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 20px; background: var(--primary); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 0.87rem; font-weight: 600; letter-spacing: -0.005em;
+      cursor: pointer; transition: background 0.15s, box-shadow 0.15s, transform 0.05s;
+      font-family: inherit;
+    }
+    .btn:hover { background: var(--primary-hover); box-shadow: var(--shadow-md); }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { background: var(--border-strong); cursor: not-allowed; box-shadow: none; }
+    .btn.btn-primary { background: var(--primary); }
+    .btn.btn-success { background: var(--success); }
+    .btn.btn-success:hover { background: #047857; }
+    .btn.btn-ghost {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn.btn-ghost:hover { background: var(--bg); color: var(--text); box-shadow: none; }
+
+    .btn-row { display: flex; align-items: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+
+    .spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Legend (collapsible) */
+    .legend {
+      margin-top: 16px; border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .legend summary {
+      list-style: none; padding: 12px 16px;
+      font-size: 0.83rem; font-weight: 600; color: var(--text);
+      cursor: pointer; user-select: none;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: background 0.15s;
+    }
+    .legend summary::-webkit-details-marker { display: none; }
+    .legend summary:hover { background: var(--bg); }
+    .legend summary .chevron {
+      width: 14px; height: 14px; color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+    .legend[open] summary .chevron { transform: rotate(180deg); }
+    .legend-body {
+      padding: 4px 16px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 0.82rem; color: var(--text-muted); line-height: 1.7;
+    }
+    .legend-body strong { color: var(--text); font-weight: 600; }
+    .legend-body .section { margin-top: 10px; }
+    .legend-body .row { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+    .legend .dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .legend .dot.error    { background: var(--danger); }
+    .legend .dot.low      { background: var(--warning); }
+    .legend .dot.speed    { background: var(--purple); }
+    .legend .dot.location { background: var(--teal); }
+    .legend .dot.signature{ background: var(--warning); }
+
+    /* Error box */
+    .error-box {
+      background: var(--danger-bg); color: var(--danger);
+      border: 1px solid var(--danger-border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      margin-top: 14px; font-size: 0.85rem; display: none;
+    }
+
+    /* Driver tabs */
+    .tabs-bar {
+      display: flex; flex-wrap: wrap; gap: 2px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      padding: 10px 16px; border: none; background: transparent;
+      font-family: inherit; font-size: 0.87rem; font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: all 0.15s;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .tab-btn:hover { color: var(--text); background: var(--bg); }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--primary); font-weight: 600; }
+    .tab-btn.failed { color: var(--danger); }
+    .avatar {
+      width: 22px; height: 22px; border-radius: 50%;
+      color: #fff; font-size: 0.7rem; font-weight: 700;
+      display: grid; place-items: center; letter-spacing: -0.02em;
+      flex-shrink: 0;
+    }
+    .tab-btn .count {
+      display: inline-block; padding: 1px 8px; border-radius: 999px;
+      font-size: 0.7rem; font-weight: 600;
+      background: var(--border); color: var(--text-muted);
+    }
+    .tab-btn.active .count { background: var(--primary); color: #fff; }
+    .tab-btn.has-errors .count { background: var(--danger-bg); color: var(--danger); }
+    .tab-btn.has-errors.active .count { background: var(--danger); color: #fff; }
+
+    .tab-panel { display: none; animation: fadeIn 0.2s ease; }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    /* Log info header */
+    .log-info {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 24px;
+      padding: 18px 22px; margin-bottom: 20px;
+      background: var(--primary); color: #fff;
+      border-radius: var(--radius);
+    }
+    .log-info .item { display: flex; flex-direction: column; gap: 4px; }
+    .log-info .label {
+      font-size: 0.7rem; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+    }
+    .log-info .value {
+      font-size: 1rem; font-weight: 600; letter-spacing: -0.01em;
+      word-break: break-word;
+    }
+
+    /* Summary badges */
+    .summary {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px; margin-bottom: 22px;
+    }
+    .badge {
+      padding: 14px 16px; border-radius: var(--radius);
+      font-size: 0.78rem; font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .badge:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .badge .num {
+      font-size: 1.5rem; font-weight: 700; display: block; line-height: 1.1;
+      margin-bottom: 4px; letter-spacing: -0.02em;
+    }
+    .badge.neutral   { color: var(--text-muted); }
+    .badge.neutral .num { color: var(--text); }
+    .badge.error     { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger-border); }
+    .badge.low       { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+    .badge.speed     { background: var(--purple-bg);  color: var(--purple);  border-color: var(--purple-border); }
+    .badge.location  { background: var(--teal-bg);    color: var(--teal);    border-color: var(--teal-border); }
+    .badge.signature { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+    .badge.clean     { background: var(--success-bg); color: var(--success); border-color: var(--success-border); }
+    .badge.clean .num { color: var(--success); }
+
+    /* Filter chips */
+    .filter-bar {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      margin-bottom: 16px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-btn {
+      padding: 5px 12px; border-radius: 999px;
+      font-family: inherit; font-size: 0.78rem; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface);
+      cursor: pointer; transition: all 0.12s; color: var(--text-muted);
+    }
+    .filter-btn:hover { border-color: var(--border-strong); color: var(--text); }
+    .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .filter-btn.f-error.active    { background: var(--danger);  border-color: var(--danger); }
+    .filter-btn.f-low.active      { background: var(--warning); border-color: var(--warning); }
+    .filter-btn.f-speed.active    { background: var(--purple);  border-color: var(--purple); }
+    .filter-btn.f-location.active { background: var(--teal);    border-color: var(--teal); }
+    .filter-btn.f-signature.active{ background: var(--warning); border-color: var(--warning); }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto; border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead tr {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    thead th {
+      padding: 10px 14px; text-align: left;
+      font-weight: 600; font-size: 0.74rem;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-muted); white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--bg); }
+    tbody tr.hidden { display: none; }
+    tbody td { padding: 11px 14px; vertical-align: middle; }
+
+    .tag {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+    }
+    .tag.error    { background: var(--danger-bg);  color: var(--danger);  }
+    .tag.low      { background: var(--warning-bg); color: var(--warning); }
+    .tag.speed    { background: var(--purple-bg);  color: var(--purple);  }
+    .tag.location { background: var(--teal-bg);    color: var(--teal);    }
+    .tag.signature{ background: var(--warning-bg); color: var(--warning); }
+
+    .rule-pill {
+      display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm);
+      font-size: 0.74rem; font-weight: 500; white-space: nowrap;
+      border: 1px solid var(--border);
+    }
+    .rule-pill.active     { background: var(--accent-soft); color: var(--accent); border-color: #bfdbfe; }
+    .rule-pill.stationary { background: var(--warning-bg);  color: var(--warning); border-color: var(--warning-border); }
+    .rule-pill.speed      { background: var(--purple-bg);   color: var(--purple);  border-color: var(--purple-border); }
+    .rule-pill.location   { background: var(--teal-bg);     color: var(--teal);    border-color: var(--teal-border); }
+    .rule-pill.signature  { background: var(--warning-bg);  color: var(--warning); border-color: var(--warning-border); }
+
+    .diff-neg { color: var(--danger); font-weight: 600; }
+    .diff-pos { color: var(--success); font-weight: 600; }
+    .diff-zero{ color: var(--text-faint); }
+    .arrow    { color: var(--text-faint); margin: 0 4px; }
+
+    .mph-badge {
+      display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm);
+      background: var(--purple-bg); color: var(--purple);
+      border: 1px solid var(--purple-border);
+      font-weight: 700; font-size: 0.76rem;
+    }
+
+    /* Sheet preview */
+    .preview { margin: 0 0 22px; }
+    .preview-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+    }
+    .preview-head strong { font-size: 0.87rem; }
+    .preview-head span { font-size: 0.78rem; color: var(--text-muted); }
+    table.sheet-preview { font-size: 0.8rem; }
+    table.sheet-preview th { font-size: 0.68rem; }
+    table.sheet-preview td {
+      padding: 7px 10px; white-space: nowrap; font-weight: 500;
+      text-align: center;
+    }
+    table.sheet-preview td:first-child { text-align: left; font-weight: 600; }
+    td.sv-good { color: var(--success);  background: var(--success-bg); }
+    td.sv-bad  { color: var(--danger);   background: var(--danger-bg); }
+    td.sv-corr { color: var(--warning);  background: var(--warning-bg); }
+    td.sv-na   { color: var(--text-faint); }
+    .preview-note {
+      font-size: 0.76rem; color: var(--text-muted);
+      margin-top: 8px; line-height: 1.6;
+    }
+    .preview-note strong { color: var(--warning); }
+
+    .empty-state {
+      text-align: center; padding: 48px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .big {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: var(--success-bg); color: var(--success);
+      display: grid; place-items: center; margin: 0 auto 14px;
+      font-size: 1.6rem;
+    }
+    .empty-state strong { color: var(--text); font-size: 0.95rem; }
+    .empty-state p { font-size: 0.85rem; margin-top: 4px; }
+
+    #results { display: none; }
+
+    /* Responsive */
+    @media (max-width: 720px) {
+      header { padding: 14px 20px; }
+      .container { margin: 20px auto; padding: 0 16px; }
+      .card { padding: 20px; }
+      .status-pill { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">EL</div>
+    <div class="brand-text">
+      <h1>ELD Checker</h1>
+      <span>Odometer &amp; HOS validation for TruckX logbooks</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div class="status-pill" id="sheetPill">
+      <span class="dot"></span>
+      <span id="sheetPillText">Sheet target unknown</span>
+    </div>
+    <a href="/logout" style="font-size:.78rem;color:var(--text-muted);text-decoration:none">Sign out</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">1</span>Upload ELD logbook PDF</div>
+    </div>
+
+    <div class="upload-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".pdf" multiple />
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <p>Drag &amp; drop one or more PDFs here, or <strong>click to browse</strong></p>
+      <div class="hint">Multi-file supported — one tab per driver</div>
+      <div class="file-name" id="fileName" style="display:none"></div>
+    </div>
+
+    <details class="legend">
+      <summary>
+        <span>View validation rules</span>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </summary>
+      <div class="legend-body">
+        <div class="section">
+          <strong>Priority levels</strong>
+          <div class="row"><span class="dot error"></span><span><strong>ERROR</strong> — counts as a Jump on the sheet</span></div>
+          <div class="row"><span class="dot low"></span><span><strong>LOW</strong> — yard/GPS drift: odometer 0, ≤ 10 miles while stopped, or drive ≤ 5 min</span></div>
+          <div class="row"><span class="dot speed"></span><span><strong>SPEED</strong> — implied driving speed exceeds 75 mph</span></div>
+          <div class="row"><span class="dot location"></span><span><strong>LOCATION</strong> — location mismatch vs. status</span></div>
+          <div class="row"><span class="dot signature"></span><span><strong>SIGNATURE</strong> — driver signature missing for a day</span></div>
+        </div>
+        <div class="section">
+          <strong>Odometer rules</strong><br>
+          ▸ <strong>DRIVING / PERSONAL / YARD</strong> — must increase in next event<br>
+          ▸ <strong>ON / OFF DUTY / SLEEPER BERTH</strong> — must not change by more than 10 miles
+        </div>
+        <div class="section">
+          <strong>Location rules</strong><br>
+          ▸ <strong>DRIVING</strong> — location must change (ignored if drive ≤ 15 min)<br>
+          ▸ <strong>ON / OFF DUTY / SLEEPER BERTH</strong> — location must not change
+        </div>
+        <div class="section">
+          <strong>Day boundaries</strong><br>
+          Events are only ever compared with the next event on the <strong>same day</strong>, so a
+          missing day in the logbook can't create a false violation.
+        </div>
+        <div class="section">
+          <strong>Signature timing</strong><br>
+          Drivers certify at the end of the day, so today's log is <strong>N/A</strong> until
+          signed — never Missing. Once the day has passed, unsigned becomes
+          <strong>Missing</strong>; if it's signed later it becomes
+          <strong>Miss/Corr</strong> and the day's Status turns Resolved.
+        </div>
+        <div class="section">
+          <strong>No log for a date</strong><br>
+          A driver who never logged in produces no page for that day — recorded as
+          <strong>Working = No</strong> with N/A across, up to and including today.
+        </div>
+      </div>
+    </details>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="analyzeBtn" disabled>
+        <span class="spinner" id="spinner"></span>
+        <span id="btnText">Analyze</span>
+      </button>
+      <button class="btn btn-ghost" id="prepareBtn"
+              title="Add today's and tomorrow's rows for every driver on the roster">
+        <span class="spinner" id="prepareSpinner" style="border-color:rgba(15,23,42,0.2);border-top-color:#0f172a"></span>
+        <span id="prepareBtnText">Prepare next day</span>
+      </button>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <div class="card" id="results">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">2</span>Analysis results</div>
+      <button class="btn btn-success" id="exportBtn">
+        <span class="spinner" id="exportSpinner"></span>
+        <span id="exportBtnText">Update Google Sheet</span>
+      </button>
+    </div>
+    <div class="tabs-bar" id="tabsBar"></div>
+    <div id="tabContents"></div>
+  </div>
+</div>
+
+<script>
+  const fileInput   = document.getElementById('fileInput');
+  const dropZone    = document.getElementById('dropZone');
+  const fileName    = document.getElementById('fileName');
+  const analyzeBtn  = document.getElementById('analyzeBtn');
+  const spinner     = document.getElementById('spinner');
+  const btnText     = document.getElementById('btnText');
+  const errorBox    = document.getElementById('errorBox');
+  const resultsCard = document.getElementById('results');
+  const tabsBar     = document.getElementById('tabsBar');
+  const tabContents = document.getElementById('tabContents');
+  const exportBtn       = document.getElementById('exportBtn');
+  const exportSpinner   = document.getElementById('exportSpinner');
+  const exportBtnText   = document.getElementById('exportBtnText');
+  const prepareBtn      = document.getElementById('prepareBtn');
+  const prepareSpinner  = document.getElementById('prepareSpinner');
+  const prepareBtnText  = document.getElementById('prepareBtnText');
+
+  prepareBtn.addEventListener('click', async () => {
+    prepareBtn.disabled = true; prepareSpinner.style.display = 'block';
+    prepareBtnText.textContent = 'Preparing…';
+    errorBox.style.display = 'none';
+    try {
+      const res  = await fetch('/prepare', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || data.error) { showError(data.error || 'Prepare failed'); return; }
+      alert(data.rows_created
+        ? `✓ ${data.rows_created} row(s) added:\n  ${data.blocks_created.join('\n  ')}`
+        : '✓ Today and tomorrow are already listed for every driver.');
+    } catch (err) { showError('Prepare error: ' + err.message); }
+    finally {
+      prepareBtn.disabled = false; prepareSpinner.style.display = 'none';
+      prepareBtnText.textContent = 'Prepare next day';
+    }
+  });
+
+  const AVATAR_COLORS = [
+    '#2563eb', '#7c3aed', '#0d9488', '#ea580c',
+    '#db2777', '#0369a1', '#4f46e5', '#b91c1c',
+  ];
+
+  // Driver names, locations and filenames come out of the uploaded PDF —
+  // never interpolate them into markup unescaped.
+  function esc(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function avatarFor(name) {
+    const safe = name || '?';
+    const initials = safe
+      .split(/\s+/).filter(Boolean).slice(0, 2)
+      .map(p => p[0].toUpperCase()).join('');
+    let hash = 0;
+    for (let i = 0; i < safe.length; i++) hash = (hash << 5) - hash + safe.charCodeAt(i);
+    const color = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+    return `<span class="avatar" style="background:${color}">${esc(initials || '?')}</span>`;
+  }
+
+  exportBtn.addEventListener('click', async () => {
+    const files = fileInput.files;
+    if (!files || !files.length) { showError('No files selected'); return; }
+    exportBtn.disabled = true; exportSpinner.style.display = 'block';
+    exportBtnText.textContent = 'Updating…';
+    const formData = new FormData();
+    Array.from(files).forEach(f => formData.append('pdf', f));
+    try {
+      const res  = await fetch('/export', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok || data.error) { showError(data.error || 'Update failed'); return; }
+      const parts = [];
+      if (data.rows_added)   parts.push(`${data.rows_added} row(s) added`);
+      if (data.rows_updated) parts.push(`${data.rows_updated} row(s) updated`);
+      let msg = `✓ ${parts.join(', ') || 'Done'}.`;
+      if (data.corrections && data.corrections.length) {
+        msg += `\n\nMarked Miss/Corr:\n  ${data.corrections.join('\n  ')}`;
+      }
+      if (data.blocks_created && data.blocks_created.length) {
+        msg += `\n\n${data.blocks_created.length} roster row(s) prepared for upcoming dates.`;
+      }
+      if (data.unknown_drivers && data.unknown_drivers.length) {
+        msg += `\n\n⚠ Not on the roster — added at the bottom, check the spelling in roster.json:\n  ${data.unknown_drivers.join('\n  ')}`;
+      }
+      if (data.columns_left_alone && data.columns_left_alone.length) {
+        msg += `\n\nColumns not recognised (left untouched):\n  ${data.columns_left_alone.join(', ')}`;
+      }
+      if (data.skipped && data.skipped.length) {
+        msg += `\n\nSkipped:\n  ${data.skipped.join('\n  ')}`;
+      }
+      alert(`${msg}\n\n${data.sheet_url}`);
+      window.open(data.sheet_url, '_blank');
+    } catch (err) { showError('Update error: ' + err.message); }
+    finally { exportBtn.disabled = false; exportSpinner.style.display = 'none'; exportBtnText.textContent = 'Update Google Sheet'; }
+  });
+
+  function updateFileNameDisplay(files) {
+    if (!files || !files.length) {
+      fileName.style.display = 'none'; fileName.textContent = '';
+      analyzeBtn.disabled = true; return;
+    }
+    fileName.style.display = 'inline-block';
+    fileName.textContent = files.length === 1
+      ? files[0].name
+      : `${files.length} files: ${Array.from(files).map(f => f.name).join(', ')}`;
+    analyzeBtn.disabled = false;
+  }
+
+  fileInput.addEventListener('change', () => updateFileNameDisplay(fileInput.files));
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    const pdfs = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (!pdfs.length) return;
+    const dt = new DataTransfer();
+    pdfs.forEach(f => dt.items.add(f));
+    fileInput.files = dt.files;
+    updateFileNameDisplay(fileInput.files);
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    const files = fileInput.files; if (!files || !files.length) return;
+    analyzeBtn.disabled = true; spinner.style.display = 'block';
+    btnText.textContent = 'Analyzing…'; errorBox.style.display = 'none'; resultsCard.style.display = 'none';
+    const formData = new FormData();
+    Array.from(files).forEach(f => formData.append('pdf', f));
+    try {
+      const res  = await fetch('/analyze', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) { showError(data.error); return; }
+      updateSheetPill(data.sheet_configured);
+      renderAllReports(data.reports || []);
+    } catch (err) { showError('Network error: ' + err.message); }
+    finally { analyzeBtn.disabled = false; spinner.style.display = 'none'; btnText.textContent = 'Analyze'; }
+  });
+
+  function showError(msg) { errorBox.textContent = msg; errorBox.style.display = 'block'; }
+
+  function updateSheetPill(configured) {
+    const pill = document.getElementById('sheetPill');
+    document.getElementById('sheetPillText').textContent =
+      configured ? 'Google Sheet connected' : 'No sheet configured — set sheet_id in config.json';
+    pill.style.background   = configured ? 'var(--success-bg)'     : 'var(--warning-bg)';
+    pill.style.color        = configured ? 'var(--success)'        : 'var(--warning)';
+    pill.style.borderColor  = configured ? 'var(--success-border)' : 'var(--warning-border)';
+    pill.querySelector('.dot').style.background = configured ? 'var(--success)' : 'var(--warning)';
+    exportBtn.disabled = !configured;
+    exportBtn.title = configured ? '' : 'Set sheet_id in config.json first';
+  }
+
+  function switchTab(idx) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', +b.dataset.idx === idx));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', +p.dataset.idx === idx));
+  }
+
+  function applyPanelFilter(idx, type) {
+    const panel = document.querySelector(`.tab-panel[data-idx="${idx}"]`);
+    if (!panel) return;
+    panel.querySelectorAll('tbody tr').forEach(row => {
+      row.classList.toggle('hidden', type !== 'ALL' && row.dataset.type !== type);
+    });
+    panel.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === type);
+    });
+  }
+
+  function renderAllReports(reports) {
+    if (!reports.length) { showError('No reports returned'); return; }
+
+    tabsBar.innerHTML = reports.map((r, i) => {
+      if (r.error) {
+        return `<button class="tab-btn failed" data-idx="${i}" onclick="switchTab(${i})">${esc(r.filename || 'File ' + (i+1))}</button>`;
+      }
+      const errCount = (r.findings || []).filter(f => f.type === 'ERROR').length;
+      const cls = errCount ? 'has-errors' : '';
+      const label = r.driver_name && r.driver_name !== 'Unknown' ? r.driver_name : (r.filename || 'File ' + (i+1));
+      return `<button class="tab-btn ${cls}" data-idx="${i}" onclick="switchTab(${i})">
+        ${avatarFor(label)}<span>${esc(label)}</span><span class="count">${r.total_findings ?? 0}</span>
+      </button>`;
+    }).join('');
+
+    tabContents.innerHTML = reports.map((r, i) => `<div class="tab-panel" data-idx="${i}">${renderReportPanel(r, i)}</div>`).join('');
+
+    switchTab(0);
+    resultsCard.style.display = 'block';
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── Sheet preview: the exact values that will be written, per day ──
+  const SHEET_COLS = [
+    ['date',           'Date'],
+    ['working',        'Working'],
+    ['unassigned',     'Unassigned'],
+    ['dvir',           'DVIR'],
+    ['shipping_id',    'Shipping ID'],
+    ['pc',             'PC'],
+    ['sign',           'Sign'],
+    ['jump',           'Jump'],
+    ['start_location', 'Start Loc'],
+    ['destination',    'Destination'],
+    ['trailer_id',     'Trailer ID'],
+    ['tamper',         'Tamper'],
+    ['status',         'Status'],
+  ];
+
+  function cellClass(value) {
+    if (value === 'Yes' || value === 'Okay')      return 'sv-good';
+    if (value === 'Missing' || value === 'Pending') return 'sv-bad';
+    if (value === 'Miss/Corr' || value === 'Resolved') return 'sv-corr';
+    if (value === 'N/A')                          return 'sv-na';
+    return '';
+  }
+
+  function renderSheetPreview(data) {
+    const rows = data.sheet_rows || [];
+    if (!rows.length) return '';
+
+    const body = rows.map(r => `
+      <tr>${SHEET_COLS.map(([key, _]) => {
+        const v = r[key] ?? '';
+        const bad = (key === 'jump' || key === 'unassigned' || key === 'tamper') && v === 'Yes';
+        return `<td class="${bad ? 'sv-bad' : cellClass(v)}">${esc(v)}</td>`;
+      }).join('')}</tr>`).join('');
+
+    const miles = rows.map(r => r._miles_today).filter(m => m || m === 0);
+
+    return `
+      <div class="preview">
+        <div class="preview-head">
+          <strong>Rows to be written</strong>
+          <span>${rows.length} day${rows.length === 1 ? '' : 's'}${
+            miles.length ? ' &middot; ' + miles.map(m => m + ' mi').join(', ') : ''}</span>
+        </div>
+        <div class="table-wrap">
+          <table class="sheet-preview">
+            <thead><tr>${SHEET_COLS.map(([_, label]) => `<th>${label}</th>`).join('')}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+        <p class="preview-note">
+          HOS Violations, Action Taken, Remark and Trailer Hard Copy are never written &mdash; they stay yours.
+          An item the sheet already records as <em>Missing</em> that now reads <em>Yes</em> is written as
+          <strong>Miss/Corr</strong> and the day&rsquo;s Status becomes <strong>Resolved</strong>.
+        </p>
+      </div>`;
+  }
+
+  function renderReportPanel(data, idx) {
+    if (data.error) {
+      return `<div class="error-box" style="display:block">${esc(data.filename)}: ${esc(data.error)}</div>`;
+    }
+
+    const dateRange = data.date_from
+      ? (data.date_to && data.date_to !== data.date_from
+          ? `${data.date_from} → ${data.date_to}`
+          : data.date_from)
+      : '—';
+
+    const errors     = data.findings.filter(f => f.type === 'ERROR').length;
+    const lows       = data.findings.filter(f => f.type === 'LOW').length;
+    const speeds     = data.findings.filter(f => f.type === 'SPEED').length;
+    const locations  = data.findings.filter(f => f.type === 'LOCATION').length;
+    const signatures = data.findings.filter(f => f.type === 'SIGNATURE').length;
+
+    const logInfoHtml = `
+      <div class="log-info">
+        <div class="item"><span class="label">Driver</span><span class="value">${esc(data.driver_name || 'Unknown')}</span></div>
+        <div class="item"><span class="label">Logbook Period</span><span class="value">${esc(dateRange)}</span></div>
+        <div class="item"><span class="label">Source File</span><span class="value">${esc(data.filename || '—')}</span></div>
+      </div>`;
+
+    const summaryHtml = `
+      <div class="summary">
+        <div class="badge neutral"><span class="num">${data.total_events}</span>Log Events</div>
+        <div class="badge neutral"><span class="num">${data.total_findings}</span>Total Findings</div>
+        ${errors     ? `<div class="badge error"><span class="num">${errors}</span>Errors</div>` : ''}
+        ${lows       ? `<div class="badge low"><span class="num">${lows}</span>Low Priority</div>` : ''}
+        ${speeds     ? `<div class="badge speed"><span class="num">${speeds}</span>Speed Alerts</div>` : ''}
+        ${locations  ? `<div class="badge location"><span class="num">${locations}</span>Location Issues</div>` : ''}
+        ${signatures ? `<div class="badge signature"><span class="num">${signatures}</span>Signature Missing</div>` : ''}
+        ${data.total_findings === 0 ? `<div class="badge clean"><span class="num">✓</span>No Issues Found</div>` : ''}
+      </div>`;
+
+    if (data.findings.length === 0) {
+      return `${logInfoHtml}${summaryHtml}
+        <div class="empty-state">
+          <div class="big">✓</div>
+          <strong>All readings valid</strong>
+          <p>Every event transition follows the expected rules.</p>
+        </div>${renderSheetPreview(data)}`;
+    }
+
+    const filterHtml = `
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="ALL" onclick="applyPanelFilter(${idx}, 'ALL')">All (${data.total_findings})</button>
+        ${errors    ? `<button class="filter-btn f-error"    data-filter="ERROR"    onclick="applyPanelFilter(${idx}, 'ERROR')">Errors (${errors})</button>` : ''}
+        ${lows      ? `<button class="filter-btn f-low"      data-filter="LOW"      onclick="applyPanelFilter(${idx}, 'LOW')">Low (${lows})</button>` : ''}
+        ${speeds    ? `<button class="filter-btn f-speed"    data-filter="SPEED"    onclick="applyPanelFilter(${idx}, 'SPEED')">Speed (${speeds})</button>` : ''}
+        ${locations ? `<button class="filter-btn f-location" data-filter="LOCATION" onclick="applyPanelFilter(${idx}, 'LOCATION')">Location (${locations})</button>` : ''}
+        ${signatures? `<button class="filter-btn f-signature" data-filter="SIGNATURE" onclick="applyPanelFilter(${idx}, 'SIGNATURE')">Signature (${signatures})</button>` : ''}
+      </div>`;
+
+    const ruleLabel = rule => {
+      if (rule === 'active_no_increase')          return '<span class="rule-pill active">Must Increase</span>';
+      if (rule === 'stationary_changed')          return '<span class="rule-pill stationary">Must Not Change</span>';
+      if (rule === 'speed_alert')                 return '<span class="rule-pill speed">Speed Limit</span>';
+      if (rule === 'driving_no_location_change')  return '<span class="rule-pill location">No Location Change</span>';
+      if (rule === 'stationary_location_changed') return '<span class="rule-pill location">Location Changed</span>';
+      if (rule === 'signature_missing')           return '<span class="rule-pill signature">Signature Missing</span>';
+      if (rule === 'unreadable_rows')             return '<span class="rule-pill stationary">Unreadable Rows</span>';
+      return esc(rule);
+    };
+
+    const diffClass = d => d > 0 ? 'diff-pos' : d < 0 ? 'diff-neg' : 'diff-zero';
+    const diffFmt   = d => (d > 0 ? '+' : '') + d.toLocaleString();
+    const tagClass  = t => ({ ERROR: 'error', LOW: 'low', SPEED: 'speed', LOCATION: 'location', SIGNATURE: 'signature' }[t] || 'error');
+    const tagLabel  = t => ({ ERROR: 'ERROR', LOW: 'LOW', SPEED: 'SPEED', LOCATION: 'LOCATION', SIGNATURE: 'SIGNATURE' }[t] || t);
+
+    const rows = data.findings.map(f => {
+      let extraCol;
+      if (f.type === 'SPEED') {
+        extraCol = `<span class="mph-badge">${esc(f.implied_mph)} mph</span><br><small style="color:var(--text-faint)">${esc(f.duration || '')}</small>`;
+      } else if (f.type === 'LOCATION') {
+        extraCol = `<small style="color:var(--teal)">${esc(f.from_loc || '—')}<br>→ ${esc(f.to_loc || '—')}</small>`;
+      } else if (f.type === 'SIGNATURE') {
+        extraCol = `<strong style="color:var(--warning)">Not signed</strong>`;
+      } else {
+        extraCol = esc(f.duration || '—');
+      }
+
+      return `
+        <tr data-type="${esc(f.type)}">
+          <td><span class="tag ${tagClass(f.type)}">${esc(tagLabel(f.type))}</span></td>
+          <td>${esc(f.date ?? '—')}</td>
+          <td>${esc(f.time)}</td>
+          <td>
+            <strong>${esc(f.status)}</strong> <span class="arrow">→</span> ${esc(f.next_status)}
+            <br><small style="color:var(--text-faint)">${esc(f.next_time)}</small>
+          </td>
+          <td>${ruleLabel(f.rule)}</td>
+          <td>${esc(f.from_odo.toLocaleString())}</td>
+          <td>${esc(f.to_odo.toLocaleString())}</td>
+          <td class="${diffClass(f.diff)}">${esc(diffFmt(f.diff))}</td>
+          <td>${extraCol}</td>
+        </tr>`;
+    }).join('');
+
+    const tableHtml = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Priority</th><th>Date</th><th>Time</th><th>Transition</th>
+              <th>Rule</th><th>From ODO</th><th>To ODO</th><th>Change</th><th>Duration / Speed</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+
+    return `${logInfoHtml}${summaryHtml}${renderSheetPreview(data)}${filterHtml}${tableHtml}`;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "_comment": "Drivers in the order rows should appear for each date. 'aliases' catches spellings the logbook PDF may use instead of 'name'.",
+  "drivers": [
+    {
+      "name": "Driver One",
+      "unit": "1001",
+      "aliases": []
+    },
+    {
+      "name": "Driver Two",
+      "unit": "1002",
+      "aliases": [
+        "Driver Too"
+      ]
+    }
+  ]
+}

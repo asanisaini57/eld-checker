@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.xlsx
+
+# Driver logbooks — contain personal data
+*.pdf
+
+# Credentials — never commit
+service_account.json
+*.json.bak
+.env
+
+# Local settings and real employee data — copy the .example files instead
+config.json
+roster.json
+server.log
+
+# Local editor/agent settings
+.claude/settings.local.json

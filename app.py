@@ -134,14 +134,32 @@ def load_roster():
         return []
 
 
+def _first_last(name):
+    """('ryan', 'calvin') for 'Ryan Thomas Anthony Calvin'."""
+    parts = _norm_driver(name).split()
+    return (parts[0], parts[-1]) if len(parts) >= 2 else None
+
+
 def match_roster_driver(name, roster):
-    """Resolve a name from a PDF to its roster entry, or None."""
+    """Resolve a name from a PDF to its roster entry, or None.
+
+    Exact name first, then aliases, then first-and-last name. The last step
+    exists because TruckX carries a driver's full legal name — "Ryan Thomas
+    Anthony Calvin" — where the sheet records "Ryan Calvin".
+    """
     target = _norm_driver(name)
     for entry in roster:
         if target == _norm_driver(entry.get("name")):
             return entry
+    for entry in roster:
         if any(target == _norm_driver(a) for a in entry.get("aliases", [])):
             return entry
+
+    ends = _first_last(name)
+    if ends:
+        matches = [e for e in roster if _first_last(e.get("name", "")) == ends]
+        if len(matches) == 1:       # ambiguous first+last is no match at all
+            return matches[0]
     return None
 
 
@@ -240,14 +258,24 @@ def locations_differ(loc_a, loc_b):
     return norm(loc_a) != norm(loc_b)
 
 
+"""One name-like token: letters plus apostrophe/hyphen/dot, no digits."""
+_NAME_TOKEN = r"[A-Za-z][A-Za-z'\-.]*"
+
+
 def _clean_name(raw):
-    """Trim a captured name at the next 'Label:' and keep only name-like tokens."""
+    """Keep the leading name-like tokens, stopping at the next field label.
+
+    Token-by-token rather than a regex split: a label pattern loose enough to
+    cover 'Co-Driver:' also matched 'Calvin Co-Driver:' as one label and ate the
+    surname. A token carrying a colon is the next label, full stop.
+    """
     if not raw:
         return None
-    raw = re.split(r"\s+[A-Za-z][A-Za-z /'-]*:", raw)[0]
     toks = []
     for tok in raw.split():
-        if not re.fullmatch(r"[A-Za-z][A-Za-z'.\-]*", tok):
+        if ':' in tok:
+            break
+        if not re.fullmatch(_NAME_TOKEN, tok):
             break
         toks.append(tok)
         if len(toks) == 4:
@@ -257,19 +285,26 @@ def _clean_name(raw):
 
 
 def _extract_driver_name(flat):
-    """TruckX renders this either as 'Driver Name: X' or split as 'Driver X Name: Y'."""
+    """TruckX renders this as 'Driver Name: X', or splits it across two columns.
+
+    The split form puts however many words fit on the first line before the
+    label: 'Driver Chander Name: Shekhar', but also
+    'Driver Ryan Thomas Name: Anthony Calvin' for a four-part name.
+    """
     m = re.search(r"Driver Name:\s*(.{0,80})", flat)
     if m:
         name = _clean_name(m.group(1))
         if name:
             return name
-    m = re.search(r"Driver\s+([A-Za-z][A-Za-z'\-]{1,30})\s+Name:\s*(.{0,60})", flat)
+
+    m = re.search(rf"Driver\s+((?:{_NAME_TOKEN}\s+){{0,3}}{_NAME_TOKEN})\s+Name:\s*(.{{0,60}})",
+                  flat)
     if m:
-        first = _clean_name(m.group(1))
-        last  = _clean_name(m.group(2))
-        if first and last:
-            return f"{first} {last}"
-        return first or last
+        before = _clean_name(m.group(1))
+        after  = _clean_name(m.group(2))
+        if before and after:
+            return f"{before} {after}"
+        return before or after
     return None
 
 
@@ -433,6 +468,7 @@ def analyze_day(day, cfg, today):
     missing day in the logbook can no longer manufacture a violation.
     """
     findings = []
+    unreported = 0          # rows where the ELD reported no odometer
     events = day['events']
     speed_limit = cfg["speed_limit_mph"]
 
@@ -455,7 +491,13 @@ def analyze_day(day, cfg, today):
         }
 
         # ── Odometer ──────────────────────────────────────────────────
-        if status in ACTIVE_STATUSES and diff <= 0:
+        # TruckX writes 0 for the odometer and engine hours when the engine is
+        # off, so 0 means "not reported", not "the truck is at mile zero".
+        # Comparing against it invents a jump the size of the whole odometer.
+        if curr_odo == 0 or next_odo == 0:
+            unreported += 1
+
+        elif status in ACTIVE_STATUSES and diff <= 0:
             findings.append({**base,
                 'type': _active_priority(curr_odo, next_odo, diff, curr),
                 'rule': 'active_no_increase',
@@ -468,7 +510,7 @@ def analyze_day(day, cfg, today):
                 'message': f"Odometer changed after {status} (changed by {diff:+,})"})
 
         # ── Speed ─────────────────────────────────────────────────────
-        if status == "DRIVING" and diff > 0:
+        if status == "DRIVING" and diff > 0 and curr_odo and next_odo:
             dur_min = curr['duration_minutes']
             if dur_min:
                 implied_mph = (diff / dur_min) * 60
@@ -513,6 +555,12 @@ def analyze_day(day, cfg, today):
         findings.append({**blank, 'type': 'SIGNATURE', 'rule': 'signature_missing',
                          'date': day['date'],
                          'message': f"Driver signature/certification missing for {day['date']}"})
+
+    if unreported:
+        findings.append({**blank, 'type': 'LOW', 'rule': 'odometer_not_reported',
+                         'date': day['date'],
+                         'message': f"{unreported} transition(s) had no odometer reading "
+                                    f"(engine off, logged as 0) and were not compared"})
 
     if day['skipped_rows']:
         findings.append({**blank, 'type': 'LOW', 'rule': 'unreadable_rows',
